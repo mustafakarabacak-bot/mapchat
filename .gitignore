@@ -1,0 +1,36 @@
+# Flutter/Dart specific
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+*.iml
+*.log
+
+# Android specific
+android/app/debug/
+android/app/profile/
+android/app/release/
+
+# iOS specific
+ios/Pods/
+ios/Runner.xcworkspace/
+ios/Flutter/Debug.xcconfig
+ios/Flutter/Release.xcconfig
+ios/Flutter/Generated.xcconfig
+ios/Flutter/App.framework/
+ios/Flutter/Flutter.framework/
+ios/Flutter/flutter_export_environment.sh
+
+# Web specific
+web/packages/
+web/cache/
+
+# IDE specific
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
