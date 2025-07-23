@@ -1,0 +1,12 @@
+[
+  {
+    "origin": [
+      "https://mapchat-23288.web.app",
+      "https://mapchat-23288.firebaseapp.com", 
+      "https://web.mapchat.tr"
+    ],
+    "method": ["GET", "POST", "PUT", "DELETE", "HEAD"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": ["Content-Type", "Authorization", "Content-Length", "User-Agent", "X-Requested-With", "Cache-Control"]
+  }
+]

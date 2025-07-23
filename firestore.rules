@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // HERŞEYİ SERBEST BIRAK - GELİŞTİRME MODU
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
+
+// AÇIKLAMA:
+// Bu kural tamamen açık modda çalışır
+// Herhangi bir kimlik doğrulama gerektirmez
+// Tüm okuma/yazma işlemlerine izin verir
+// SADECE GELİŞTİRME İÇİN KULLAN!

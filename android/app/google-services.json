@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "35933174888",
+    "project_id": "mapchat-23288",
+    "storage_bucket": "mapchat-23288.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:35933174888:android:7e93503e5bc8a767970fdd",
+        "android_client_info": {
+          "package_name": "com.mapchat.tr"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "35933174888-p44qfklq0ovuid1e5nvsntod6vs857jo.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBc-Xdhpvc0t5qpZS084y48j-7S8t5twEQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "35933174888-p44qfklq0ovuid1e5nvsntod6vs857jo.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

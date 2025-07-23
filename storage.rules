@@ -1,0 +1,15 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // HERŞEYİ SERBEST BIRAK - GELİŞTİRME MODU
+    match /{allPaths=**} {
+      allow read, write: if true;
+    }
+  }
+}
+
+// AÇIKLAMA:
+// Bu kural tamamen açık modda çalışır
+// Herhangi bir kimlik doğrulama gerektirmez
+// Tüm dosya yükleme/indirme işlemlerine izin verir
+// SADECE GELİŞTİRME İÇİN KULLAN!
