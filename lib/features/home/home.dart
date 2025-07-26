@@ -49,9 +49,12 @@ class _HomeScreenState extends State<HomeScreen> {
             .doc(user.uid)
             .get();
         if (mounted && doc.exists) {
-          setState(() {
-            _userData = doc.data();
-          });
+          final data = doc.data();
+          if (data != null) {
+            setState(() {
+              _userData = data;
+            });
+          }
         }
       }
     } catch (e) {

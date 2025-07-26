@@ -1,0 +1,82 @@
+name: Build and Release APK
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.5'
+        channel: 'stable'
+
+    - name: Get dependencies
+      run: flutter pub get
+
+    - name: Generate launcher icons
+      run: flutter pub run flutter_launcher_icons
+
+    - name: Build APK
+      run: flutter build apk --release
+
+    - name: Rename APK
+      run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/MapChat.apk
+
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: MapChat-APK
+        path: build/app/outputs/flutter-apk/MapChat.apk
+
+    - name: Create Release
+      if: github.ref == 'refs/heads/main'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v1.0.${{ github.run_number }}
+        release_name: MapChat v1.0.${{ github.run_number }}
+        body: |
+          ## MapChat Android APK
+          
+          ### Features:
+          - 🗺️ Interactive map with user locations
+          - 💬 Real-time messaging
+          - 👤 User profiles
+          - 📍 Location sharing
+          - 🔔 Push notifications
+          
+          ### Changes in this release:
+          - Updated app icon with new MapChat logo
+          - Package name: com.mapchat.tr
+          - Location and notification permissions configured
+          
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset
+      if: github.ref == 'refs/heads/main'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: build/app/outputs/flutter-apk/MapChat.apk
+        asset_name: MapChat.apk
+        asset_content_type: application/vnd.android.package-archive

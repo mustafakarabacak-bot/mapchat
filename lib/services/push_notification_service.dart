@@ -2,6 +2,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:developer' as developer;
 
 class PushNotificationService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
@@ -43,11 +44,11 @@ class PushNotificationService {
       }
       
       if (kDebugMode) {
-        print('Push notification service initialized successfully');
+        developer.log('Push notification service initialized successfully', name: 'PushNotificationService');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error initializing push notifications: $e');
+        developer.log('Error initializing push notifications: $e', name: 'PushNotificationService');
       }
     }
   }
@@ -57,12 +58,12 @@ class PushNotificationService {
     try {
       // Web push notifications için token al
       final token = await _messaging.getToken();
-      if (kDebugMode) {
-        print('Web FCM Token: $token');
+      if (kDebugMode && token != null) {
+        developer.log('Web FCM Token obtained successfully', name: 'PushNotificationService');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error getting web token: $e');
+        developer.log('Error getting web token: $e', name: 'PushNotificationService');
       }
     }
   }
@@ -81,7 +82,7 @@ class PushNotificationService {
     );
     
     if (kDebugMode) {
-      print('Permission granted: ${settings.authorizationStatus}');
+      developer.log('Permission granted: ${settings.authorizationStatus}', name: 'PushNotificationService');
     }
   }
   
@@ -94,20 +95,26 @@ class PushNotificationService {
       final token = await _messaging.getToken();
       if (token == null) return;
       
+      // Network timeout ile işlem yap
       await _firestore.collection('users').doc(user.uid).update({
         'fcmTokens': FieldValue.arrayUnion([{
           'token': token,
           'platform': kIsWeb ? 'web' : 'mobile',
           'lastUpdated': FieldValue.serverTimestamp(),
         }])
-      });
+      }).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Network timeout: Token kaydedilemedi');
+        },
+      );
       
       if (kDebugMode) {
-        print('FCM Token saved: $token');
+        developer.log('FCM Token saved successfully', name: 'PushNotificationService');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error saving FCM token: $e');
+        developer.log('Error saving FCM token: $e', name: 'PushNotificationService');
       }
     }
   }
@@ -115,9 +122,9 @@ class PushNotificationService {
   // Foreground mesajları işle
   static void _handleForegroundMessage(RemoteMessage message) {
     if (kDebugMode) {
-      print('Foreground message received: ${message.messageId}');
-      print('Title: ${message.notification?.title}');
-      print('Body: ${message.notification?.body}');
+      developer.log('Foreground message received: ${message.messageId}', name: 'PushNotificationService');
+      developer.log('Title: ${message.notification?.title}', name: 'PushNotificationService');
+      developer.log('Body: ${message.notification?.body}', name: 'PushNotificationService');
     }
     
     // Bildirimi Firestore'a kaydet
@@ -127,7 +134,7 @@ class PushNotificationService {
   // Bildirime tıklanma durumunu işle
   static void _handleNotificationTap(RemoteMessage message) {
     if (kDebugMode) {
-      print('Notification tapped: ${message.messageId}');
+      developer.log('Notification tapped: ${message.messageId}', name: 'PushNotificationService');
     }
     
     // Navigation logic burada olacak
@@ -176,11 +183,11 @@ class PushNotificationService {
       });
       
       if (kDebugMode) {
-        print('Test notification sent');
+        developer.log('Test notification sent', name: 'PushNotificationService');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error sending test notification: $e');
+        developer.log('Error sending test notification: $e', name: 'PushNotificationService');
       }
     }
   }
@@ -190,11 +197,11 @@ class PushNotificationService {
     try {
       await _messaging.deleteToken();
       if (kDebugMode) {
-        print('FCM Token cleared');
+        developer.log('FCM Token cleared', name: 'PushNotificationService');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error clearing FCM token: $e');
+        developer.log('Error clearing FCM token: $e', name: 'PushNotificationService');
       }
     }
   }
@@ -202,7 +209,7 @@ class PushNotificationService {
   // Background message handler (main.dart'ta çağrılmalı)
   static Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     if (kDebugMode) {
-      print('Background message received: ${message.messageId}');
+      developer.log('Background message received: ${message.messageId}', name: 'PushNotificationService');
     }
     
     // Background'da bildirim işlemleri

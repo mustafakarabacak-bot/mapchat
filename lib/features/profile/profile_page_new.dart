@@ -36,8 +36,9 @@ class _ProfilePageState extends State<ProfilePage> {
           .doc(user.uid)
           .get();
       if (mounted) {
+        final data = doc.data();
         setState(() {
-          _userData = doc.data();
+          _userData = data;
         });
       }
     }

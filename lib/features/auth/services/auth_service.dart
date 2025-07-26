@@ -6,6 +6,15 @@ import 'dart:typed_data';
 import 'dart:io';
 import 'dart:developer' as developer;
 
+// Custom exception class for better error handling
+class AuthException implements Exception {
+  final String message;
+  AuthException(this.message);
+  
+  @override
+  String toString() => message;
+}
+
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -390,9 +399,9 @@ class AuthService extends ChangeNotifier {
       } else if (e.toString().contains('invalid-email')) {
         throw 'Geçersiz e-posta adresi';
       } else if (e.toString().contains('too-many-requests')) {
-        throw 'Çok fazla deneme. Lütfen daha sonra tekrar deneyin';
+        throw AuthException('Çok fazla deneme. Lütfen daha sonra tekrar deneyin');
       } else {
-        throw 'Giriş yapılırken hata oluştu: $e';
+        throw AuthException('Giriş yapılırken hata oluştu: $e');
       }
     } finally {
       _setLoading(false);

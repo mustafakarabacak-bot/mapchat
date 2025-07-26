@@ -43,8 +43,9 @@ class _MessagesPageState extends State<MessagesPage> {
           .doc(user.uid)
           .get();
       if (mounted) {
+        final data = doc.data();
         setState(() {
-          _userData = doc.data();
+          _userData = data;
         });
       }
     }

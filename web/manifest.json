@@ -9,7 +9,10 @@
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "scope": "/",
-    "categories": ["social", "navigation"],
+    "categories": [
+        "social",
+        "navigation"
+    ],
     "icons": [
         {
             "src": "icons/Icon-192.png",

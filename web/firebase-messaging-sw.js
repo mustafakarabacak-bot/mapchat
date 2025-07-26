@@ -4,12 +4,12 @@ importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-comp
 
 // Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyC9g0elmlnFX5h7OIcsGPhkJ8oVQKF4n2M",
-  authDomain: "mapfirebasechat.firebaseapp.com",
-  projectId: "mapfirebasechat",
-  storageBucket: "mapfirebasechat.firebasestorage.app",
-  messagingSenderId: "169958064827",
-  appId: "1:169958064827:web:36c2e70ed9fb0b5633b5d3"
+  apiKey: "AIzaSyACl-WJ00KPoYs718DO_Qzl6xOgYyaPUrM",
+  authDomain: "mapchat-23288.firebaseapp.com",
+  projectId: "mapchat-23288",
+  storageBucket: "mapchat-23288.firebasestorage.app",
+  messagingSenderId: "35933174888",
+  appId: "1:35933174888:web:b5160f53ebe9f4db970fdd"
 };
 
 // Initialize Firebase
