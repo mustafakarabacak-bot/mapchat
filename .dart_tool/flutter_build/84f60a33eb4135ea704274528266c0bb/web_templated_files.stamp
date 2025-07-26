@@ -1,0 +1,1 @@
+{"inputs":["/workspaces/mapchat/web/*/index.html","/workspaces/mapchat/web/flutter_bootstrap.js","/opt/flutter/bin/cache/engine.stamp"],"outputs":["/workspaces/mapchat/build/web/*/index.html","/workspaces/mapchat/build/web/flutter_bootstrap.js"],"buildKey":"[{\"compileTarget\":\"dart2js\",\"renderer\":\"canvaskit\",\"mainJsPath\":\"main.dart.js\"}]"}

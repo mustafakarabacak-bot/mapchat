@@ -4,6 +4,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
+import 'dart:developer' as developer;
+import 'dart:async';
 import '../../profile/user_profile_page.dart';
 
 class MapWidget extends StatefulWidget {
@@ -15,7 +17,8 @@ class MapWidget extends StatefulWidget {
 
 class _MapWidgetState extends State<MapWidget> {
   final MapController _mapController = MapController();
-  LatLng _currentLocation = const LatLng(39.925533, 32.866287); // Ankara varsayılan
+  LatLng _currentLocation =
+      const LatLng(39.925533, 32.866287); // Ankara varsayılan
   List<Marker> _userMarkers = [];
   bool _locationPermissionGranted = false;
   bool _isLoadingLocation = true;
@@ -27,59 +30,82 @@ class _MapWidgetState extends State<MapWidget> {
   }
 
   Future<void> _initializeMap() async {
-    await _requestLocationPermission();
-    if (_locationPermissionGranted) {
-      await _getCurrentLocation();
-      await _saveLocationToFirestore();
-      await _loadActiveUsers();
+    try {
+      await _requestLocationPermission();
+      if (_locationPermissionGranted) {
+        await _getCurrentLocation();
+        await _saveLocationToFirestore();
+        await _loadActiveUsers();
+      }
+    } catch (e) {
+      developer.log('Harita initialization hatası: $e', name: 'MapWidget');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingLocation = false;
+        });
+      }
     }
-    setState(() {
-      _isLoadingLocation = false;
-    });
   }
 
   Future<void> _requestLocationPermission() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return;
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+    try {
+      // Platform bağımsız konum izni kontrolü
+      LocationPermission permission = await Geolocator.checkPermission();
+      
       if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      
+      if (permission == LocationPermission.deniedForever) {
+        developer.log('Konum izni kalıcı olarak reddedildi', name: 'MapWidget');
+        setState(() {
+          _locationPermissionGranted = false;
+        });
         return;
       }
+      
+      if (permission == LocationPermission.whileInUse || 
+          permission == LocationPermission.always) {
+        setState(() {
+          _locationPermissionGranted = true;
+        });
+      }
+    } catch (e) {
+      developer.log('Konum izni hatası: $e', name: 'MapWidget');
+      setState(() {
+        _locationPermissionGranted = false;
+      });
     }
-
-    if (permission == LocationPermission.deniedForever) {
-      return;
-    }
-
-    _locationPermissionGranted = true;
   }
 
   Future<void> _getCurrentLocation() async {
     if (!_locationPermissionGranted) return;
 
     try {
-      Position position = await Geolocator.getCurrentPosition(
+      // Platform bağımsız konum alma
+      final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 5),
       );
-      
-      setState(() {
-        _currentLocation = LatLng(position.latitude, position.longitude);
-      });
 
-      // Haritayı sadece başlangıçta ortala
       if (mounted) {
-        _mapController.move(_currentLocation, 15.0);
+        setState(() {
+          _currentLocation = LatLng(position.latitude, position.longitude);
+        });
+
+        // Haritayı sadece başlangıçta ortala
+        _mapController.move(_currentLocation, 13.0);
       }
     } catch (e) {
-      print('Konum alınırken hata: $e');
+      developer.log('Konum alınırken hata: $e', name: 'MapWidget');
+      // Hata durumunda Ankara koordinatlarını kullan
+      if (mounted) {
+        setState(() {
+          _currentLocation = const LatLng(39.925533, 32.866287);
+        });
+        _mapController.move(_currentLocation, 13.0);
+      }
     }
   }
 
@@ -92,11 +118,12 @@ class _MapWidgetState extends State<MapWidget> {
           .collection('users')
           .doc(user.uid)
           .update({
-        'location': GeoPoint(_currentLocation.latitude, _currentLocation.longitude),
+        'location':
+            GeoPoint(_currentLocation.latitude, _currentLocation.longitude),
         'lastActive': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('Konum kaydedilirken hata: $e');
+      developer.log('Konum kaydedilirken hata: $e', name: 'MapWidget');
     }
   }
 
@@ -105,36 +132,34 @@ class _MapWidgetState extends State<MapWidget> {
     if (currentUser == null) return;
 
     try {
-      // Son 5 dakika içinde aktif olan kullanıcıları getir
-      final fiveMinutesAgo = DateTime.now().subtract(const Duration(minutes: 5));
-      
+      // Aktif kullanıcıları getir (sadece location varsa)
       final snapshot = await FirebaseFirestore.instance
           .collection('users')
-          .where('lastActive', isGreaterThan: Timestamp.fromDate(fiveMinutesAgo))
           .where('location', isNotEqualTo: null)
           .get();
 
       List<Marker> markers = [];
+      final fiveMinutesAgo = DateTime.now().subtract(const Duration(minutes: 5));
 
       for (var doc in snapshot.docs) {
         final userData = doc.data();
         final location = userData['location'] as GeoPoint?;
+        final lastActive = userData['lastActive'] as Timestamp?;
         
-        if (location != null) {
+        // Client-side filtering için son 5 dakika kontrolü
+        if (lastActive != null && lastActive.toDate().isAfter(fiveMinutesAgo) && location != null) {
           final isCurrentUser = doc.id == currentUser.uid;
-          
+
           markers.add(
             Marker(
               point: LatLng(location.latitude, location.longitude),
-              width: isCurrentUser ? 60 : 50,
-              height: isCurrentUser ? 60 : 50,
+              width: isCurrentUser ? 50 : 40, // Boyut küçültüldü
+              height: isCurrentUser ? 50 : 40,
               child: GestureDetector(
                 onTap: () {
                   if (isCurrentUser) {
-                    // Kendi profiline git
                     Navigator.pushNamed(context, '/profile');
                   } else {
-                    // Başka kullanıcının profiline git
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -149,38 +174,55 @@ class _MapWidgetState extends State<MapWidget> {
                 child: Container(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
+                    color: isCurrentUser
+                        ? const Color(0xFFD2042D)
+                        : Colors.green,
                     border: Border.all(
-                      color: isCurrentUser 
-                          ? const Color(0xFFD2042D) 
-                          : Colors.green,
-                      width: isCurrentUser ? 4 : 3,
+                      color: Colors.white,
+                      width: 2,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (isCurrentUser 
-                            ? const Color(0xFFD2042D) 
-                            : Colors.green).withOpacity(0.3),
-                        blurRadius: 10,
-                        spreadRadius: 2,
-                      ),
-                    ],
                   ),
-                  child: CircleAvatar(
-                    radius: isCurrentUser ? 26 : 21,
-                    backgroundColor: Colors.white,
-                    child: CircleAvatar(
-                      radius: isCurrentUser ? 23 : 18,
-                      backgroundImage: userData['profileImageUrl'] != null
-                          ? NetworkImage(userData['profileImageUrl'])
-                          : null,
-                      child: userData['profileImageUrl'] == null
-                          ? Icon(
-                              Icons.person,
-                              color: const Color(0xFFD2042D),
-                              size: isCurrentUser ? 25 : 20,
-                            )
-                          : null,
-                    ),
+                  child: ClipOval(
+                    child: userData['profileImageUrl'] != null
+                        ? Image.network(
+                            userData['profileImageUrl'],
+                            fit: BoxFit.cover,
+                            // Web ve mobil performans için cache ve boyut ayarları
+                            cacheWidth: isCurrentUser ? 50 : 40,
+                            cacheHeight: isCurrentUser ? 50 : 40,
+                            // Hızlı yükleme için optimizasyon
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                color: isCurrentUser
+                                    ? const Color(0xFFD2042D)
+                                    : Colors.green,
+                                child: Icon(
+                                  Icons.person,
+                                  color: Colors.white,
+                                  size: isCurrentUser ? 20 : 16,
+                                ),
+                              );
+                            },
+                            // Hata durumu - profil özelliklerini koruyoruz
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: isCurrentUser
+                                    ? const Color(0xFFD2042D)
+                                    : Colors.green,
+                                child: Icon(
+                                  Icons.person,
+                                  color: Colors.white,
+                                  size: isCurrentUser ? 20 : 16,
+                                ),
+                              );
+                            },
+                          )
+                        : Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: isCurrentUser ? 20 : 16,
+                          ),
                   ),
                 ),
               ),
@@ -189,11 +231,13 @@ class _MapWidgetState extends State<MapWidget> {
         }
       }
 
-      setState(() {
-        _userMarkers = markers;
-      });
+      if (mounted) {
+        setState(() {
+          _userMarkers = markers;
+        });
+      }
     } catch (e) {
-      print('Aktif kullanıcılar yüklenirken hata: $e');
+      developer.log('Aktif kullanıcılar yüklenirken hata: $e', name: 'MapWidget');
     }
   }
 
@@ -220,25 +264,43 @@ class _MapWidgetState extends State<MapWidget> {
       mapController: _mapController,
       options: MapOptions(
         initialCenter: _currentLocation,
-        initialZoom: 15.0,
-        maxZoom: 18.0,
-        minZoom: 3.0,
+        initialZoom: 13.0, // Daha düşük başlangıç zoom
+        maxZoom: 17.0, // Max zoom artırıldı biraz
+        minZoom: 8.0, // Min zoom düşürüldü
         interactionOptions: const InteractionOptions(
           flags: InteractiveFlag.all,
         ),
+        // Web ve mobil performans için
+        keepAlive: true,
+        // Arka plan rengi - harita yüklenene kadar
+        backgroundColor: const Color(0xFF1a1a1a),
       ),
       children: [
         TileLayer(
           urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
-          subdomains: const ['a', 'b', 'c', 'd'],
+          subdomains: const ['a', 'b', 'c'],
           additionalOptions: const {
             'attribution': '',
           },
+          // Web ve mobil performans optimizasyonları
+          maxZoom: 17,
+          retinaMode: false, // Performans için kapalı
+          tileSize: 256,
+          // Hızlı yükleme için
+          tileProvider: NetworkTileProvider(),
+          // Cache ayarları
+          maxNativeZoom: 17,
+          // Error handling
+          errorTileCallback: (tile, error, stackTrace) {
+            developer.log('Tile yükleme hatası: $error', name: 'MapWidget');
+          },
         ),
-        
-        // Kullanıcı marker'ları
+
+        // Kullanıcı marker'ları - optimize edilmiş
         MarkerLayer(
           markers: _userMarkers,
+          // Performans için rotate disabled
+          rotate: false,
         ),
       ],
     );

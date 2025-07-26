@@ -9,22 +9,23 @@ import 'dart:developer' as developer;
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final firebase_storage.FirebaseStorage _storage = firebase_storage.FirebaseStorage.instance;
-  
+  final firebase_storage.FirebaseStorage _storage =
+      firebase_storage.FirebaseStorage.instance;
+
   User? _user;
   bool _isLoading = false;
 
   User? get user => _user;
   bool get isLoading => _isLoading;
   bool get isLoggedIn => _user != null;
-  
+
   // Stream getter for auth state changes
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
   AuthService() {
     // Initialize current user
     _user = _auth.currentUser;
-    
+
     // Listen to auth state changes
     _auth.authStateChanges().listen((User? user) {
       _user = user;
@@ -35,7 +36,10 @@ class AuthService extends ChangeNotifier {
   // Check username availability
   Future<bool> checkUsernameAvailability(String username) async {
     try {
-      final usernameDoc = await _firestore.collection('usernames').doc(username.toLowerCase()).get();
+      final usernameDoc = await _firestore
+          .collection('usernames')
+          .doc(username.toLowerCase())
+          .get();
       return !usernameDoc.exists;
     } catch (e) {
       throw 'Kullanıcı adı kontrolü sırasında hata oluştu: $e';
@@ -45,12 +49,23 @@ class AuthService extends ChangeNotifier {
   // Check phone number availability
   Future<bool> checkPhoneAvailability(String phoneNumber) async {
     try {
-      final phoneQuery = await _firestore.collection('users')
+      final phoneQuery = await _firestore
+          .collection('users')
           .where('phoneNumber', isEqualTo: phoneNumber)
           .get();
       return phoneQuery.docs.isEmpty;
     } catch (e) {
       throw 'Telefon numarası kontrolü sırasında hata oluştu: $e';
+    }
+  }
+
+  // Check email availability
+  Future<List<String>> fetchSignInMethodsForEmail(String email) async {
+    try {
+      return await _auth.fetchSignInMethodsForEmail(email);
+    } catch (e) {
+      developer.log('Error checking email availability: $e');
+      return [];
     }
   }
 
@@ -110,38 +125,38 @@ class AuthService extends ChangeNotifier {
   // Upload profile image with error handling
   Future<String?> uploadProfileImage(File? imageFile) async {
     if (imageFile == null) return null;
-    
+
     try {
       final user = _auth.currentUser;
       if (user == null) throw 'Kullanıcı oturumu bulunamadı';
-      
+
       // Check file size (max 5MB)
       final fileSize = await imageFile.length();
       if (fileSize > 5 * 1024 * 1024) {
         throw 'Resim boyutu 5MB\'dan büyük olamaz';
       }
-      
+
       // Check file extension
       final fileName = imageFile.path.toLowerCase();
-      if (!fileName.endsWith('.jpg') && 
-          !fileName.endsWith('.jpeg') && 
+      if (!fileName.endsWith('.jpg') &&
+          !fileName.endsWith('.jpeg') &&
           !fileName.endsWith('.png')) {
         throw 'Sadece JPG, JPEG ve PNG formatları desteklenir';
       }
-      
+
       // Create unique filename
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final extension = fileName.split('.').last;
       final uniqueFileName = '${user.uid}_$timestamp.$extension';
-      
+
       // Upload to Firebase Storage
       final ref = _storage.ref().child('profile_images/$uniqueFileName');
       final uploadTask = ref.putFile(imageFile);
-      
+
       // Wait for upload completion
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
-      
+
       return downloadUrl;
     } catch (e) {
       if (e.toString().contains('network')) {
@@ -160,18 +175,23 @@ class AuthService extends ChangeNotifier {
   }
 
   // Register with email and password
-  Future<String?> registerWithEmail(String email, String password, String username, String fullName) async {
+  Future<String?> registerWithEmail(
+      String email, String password, String username, String fullName) async {
     try {
       _setLoading(true);
-      
+
       // Check if username already exists
-      final usernameDoc = await _firestore.collection('usernames').doc(username.toLowerCase()).get();
+      final usernameDoc = await _firestore
+          .collection('usernames')
+          .doc(username.toLowerCase())
+          .get();
       if (usernameDoc.exists) {
         return 'Bu kullanıcı adı zaten kullanılıyor';
       }
 
       // Create user
-      final UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+      final UserCredential userCredential =
+          await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -188,7 +208,10 @@ class AuthService extends ChangeNotifier {
         });
 
         // Reserve username
-        await _firestore.collection('usernames').doc(username.toLowerCase()).set({
+        await _firestore
+            .collection('usernames')
+            .doc(username.toLowerCase())
+            .set({
           'uid': userCredential.user!.uid,
           'createdAt': FieldValue.serverTimestamp(),
         });
@@ -219,25 +242,32 @@ class AuthService extends ChangeNotifier {
   }
 
   // Sign in with email/username and password
-  Future<String?> signInWithEmailOrUsername(String loginInput, String password) async {
+  Future<String?> signInWithEmailOrUsername(
+      String loginInput, String password) async {
     try {
       _setLoading(true);
-      
+
       String email = loginInput;
-      
+
       // Check if input is username (no @ symbol)
       if (!loginInput.contains('@')) {
         // Look up email by username
-        final usernameDoc = await _firestore.collection('usernames').doc(loginInput.toLowerCase()).get();
+        final usernameDoc = await _firestore
+            .collection('usernames')
+            .doc(loginInput.toLowerCase())
+            .get();
         if (!usernameDoc.exists) {
           return 'Kullanıcı bulunamadı';
         }
-        
-        final userDoc = await _firestore.collection('users').doc(usernameDoc.data()!['uid']).get();
+
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(usernameDoc.data()!['uid'])
+            .get();
         if (!userDoc.exists) {
           return 'Kullanıcı bulunamadı';
         }
-        
+
         email = userDoc.data()!['email'];
       }
 
@@ -273,7 +303,8 @@ class AuthService extends ChangeNotifier {
   }
 
   // Email ile kayıt (eski method - geriye dönük uyumluluk için)
-  Future<String?> signUpWithEmail(String email, String password, String name) async {
+  Future<String?> signUpWithEmail(
+      String email, String password, String name) async {
     // Generate username from email
     String username = email.split('@')[0].toLowerCase();
     return registerWithEmail(email, password, username, name);
@@ -291,7 +322,10 @@ class AuthService extends ChangeNotifier {
   // Check if username is available
   Future<bool> isUsernameAvailable(String username) async {
     try {
-      final doc = await _firestore.collection('usernames').doc(username.toLowerCase()).get();
+      final doc = await _firestore
+          .collection('usernames')
+          .doc(username.toLowerCase())
+          .get();
       return !doc.exists;
     } catch (e) {
       return false;
@@ -336,15 +370,17 @@ class AuthService extends ChangeNotifier {
   }
 
   // Sign in with email and password
-  Future<User?> signInWithEmailAndPassword(String email, String password) async {
+  Future<User?> signInWithEmailAndPassword(
+      String email, String password) async {
     try {
       _setLoading(true);
-      
-      final UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+
+      final UserCredential userCredential =
+          await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
-      
+
       return userCredential.user;
     } catch (e) {
       if (e.toString().contains('user-not-found')) {
@@ -363,16 +399,18 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  // Create user with email and password, save to Firestore  
-  Future<User?> createUserWithEmailAndPassword(String email, String name, String password) async {
+  // Create user with email and password, save to Firestore
+  Future<User?> createUserWithEmailAndPassword(
+      String email, String name, String password) async {
     try {
       _setLoading(true);
-      
-      final UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+
+      final UserCredential userCredential =
+          await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-      
+
       if (userCredential.user != null) {
         // Save user data to Firestore (verification code artık kaydetmiyoruz)
         await _firestore.collection('users').doc(userCredential.user!.uid).set({
@@ -384,7 +422,7 @@ class AuthService extends ChangeNotifier {
           'profileCompleted': false,
         });
       }
-      
+
       return userCredential.user;
     } catch (e) {
       if (e.toString().contains('email-already-in-use')) {
@@ -403,31 +441,35 @@ class AuthService extends ChangeNotifier {
   Future<bool> verifyEmailWithCode(String email, String inputCode) async {
     try {
       _setLoading(true);
-      
+
       // Get verification code from Firestore
-      final doc = await _firestore.collection('verification_codes').doc(email).get();
-      
+      final doc =
+          await _firestore.collection('verification_codes').doc(email).get();
+
       if (!doc.exists) {
         throw 'Doğrulama kodu bulunamadı';
       }
-      
+
       final data = doc.data()!;
       final storedCode = data['code'] as String;
       final expiresAt = data['expiresAt'] as Timestamp;
-      
+
       // Check if code expired
       if (DateTime.now().isAfter(expiresAt.toDate())) {
         throw 'Doğrulama kodu süresi doldu';
       }
-      
+
       // Check if code matches
       if (storedCode != inputCode) {
         throw 'Hatalı doğrulama kodu';
       }
-      
+
       // Update user verification status
-      final userQuery = await _firestore.collection('users').where('email', isEqualTo: email).get();
-      
+      final userQuery = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .get();
+
       if (userQuery.docs.isNotEmpty) {
         final userDoc = userQuery.docs.first;
         await userDoc.reference.update({
@@ -435,17 +477,17 @@ class AuthService extends ChangeNotifier {
           'isActive': true,
           'verifiedAt': FieldValue.serverTimestamp(),
         });
-        
+
         // Send actual email verification
         final user = _auth.currentUser;
         if (user != null) {
           await user.sendEmailVerification();
         }
       }
-      
+
       // Clean up verification code
       await _firestore.collection('verification_codes').doc(email).delete();
-      
+
       return true;
     } catch (e) {
       throw e.toString();
@@ -455,16 +497,19 @@ class AuthService extends ChangeNotifier {
   }
 
   // Profil resmini Firebase Storage'a yükle (yeni metod)
-  Future<String> uploadProfileImageBytes(List<int> imageBytes, String username) async {
+  Future<String> uploadProfileImageBytes(
+      List<int> imageBytes, String username) async {
     try {
-      final String fileName = 'profile_images/${_user?.uid}_${username}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final String fileName =
+          'profile_images/${_user?.uid}_${username}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final firebase_storage.Reference ref = _storage.ref().child(fileName);
-      
-      final firebase_storage.UploadTask uploadTask = ref.putData(imageBytes as Uint8List);
-      
+
+      final firebase_storage.UploadTask uploadTask =
+          ref.putData(imageBytes as Uint8List);
+
       final firebase_storage.TaskSnapshot snapshot = await uploadTask;
       final String downloadUrl = await snapshot.ref.getDownloadURL();
-      
+
       developer.log('Profile image uploaded successfully: $downloadUrl');
       return downloadUrl;
     } catch (e) {
@@ -492,7 +537,7 @@ class AuthService extends ChangeNotifier {
       }
 
       await _firestore.collection('users').doc(_user!.uid).update(userData);
-      
+
       developer.log('User profile updated successfully');
     } catch (e) {
       developer.log('Error updating user profile: $e');
@@ -534,7 +579,7 @@ class AuthService extends ChangeNotifier {
 
       // Firestore'a kaydet
       await _firestore.collection('users').doc(_user!.uid).update(userData);
-      
+
       developer.log('Detailed user profile updated successfully');
     } catch (e) {
       developer.log('Error updating detailed user profile: $e');
@@ -563,7 +608,7 @@ class AuthService extends ChangeNotifier {
 
       // Firestore'a kaydet
       await _firestore.collection('users').doc(_user!.uid).update(detailsData);
-      
+
       developer.log('User details updated successfully');
     } catch (e) {
       developer.log('Error updating user details: $e');
@@ -584,11 +629,138 @@ class AuthService extends ChangeNotifier {
         'completedAt': Timestamp.now(),
         'updatedAt': Timestamp.now(),
       });
-      
+
       developer.log('Profile marked as completed successfully');
     } catch (e) {
       developer.log('Error marking profile as completed: $e');
       throw 'Profil tamamlanırken hata oluştu: $e';
     }
+  }
+
+  // Create user with complete profile (one step registration)
+  Future<User?> createUserWithCompleteProfile({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String username,
+    required String phone,
+    required DateTime birthDate,
+    required String gender,
+    Uint8List? profileImageBytes,
+    String? profileImageName,
+  }) async {
+    try {
+      _setLoading(true);
+
+      // Check if username is available
+      final isUsernameAvailable = await checkUsernameAvailability(username);
+      if (!isUsernameAvailable) {
+        throw 'Bu kullanıcı adı zaten kullanılıyor';
+      }
+
+      // Create Firebase user
+      final UserCredential userCredential =
+          await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      if (userCredential.user != null) {
+        final user = userCredential.user!;
+        final fullName = '$firstName $lastName';
+
+        // Update display name
+        await user.updateDisplayName(fullName);
+
+        String? profileImageUrl;
+        
+        // Upload profile image if provided
+        if (profileImageBytes != null && profileImageName != null) {
+          try {
+            final imageRef = _storage
+                .ref()
+                .child('profile_images')
+                .child('${user.uid}_profile.jpg');
+            
+            await imageRef.putData(profileImageBytes);
+            profileImageUrl = await imageRef.getDownloadURL();
+            developer.log('Profile image uploaded successfully');
+          } catch (e) {
+            developer.log('Error uploading profile image: $e');
+            // Continue without profile image
+          }
+        }
+
+        // Create complete user document
+        await _firestore.collection('users').doc(user.uid).set({
+          'email': email,
+          'firstName': firstName,
+          'lastName': lastName,
+          'name': fullName,
+          'username': username.toLowerCase(),
+          'phone': phone,
+          'phoneNumber': phone, // Add both for compatibility
+          'birthDate': Timestamp.fromDate(birthDate),
+          'gender': gender,
+          'bio': '',
+          'profileImageUrl': profileImageUrl,
+          'galleryImages': [],
+          'profileCompleted': true,
+          'isOnline': true,
+          'lastSeen': FieldValue.serverTimestamp(),
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        // Reserve username
+        await _firestore
+            .collection('usernames')
+            .doc(username.toLowerCase())
+            .set({
+          'userId': user.uid,
+          'username': username.toLowerCase(),
+          'reservedAt': FieldValue.serverTimestamp(),
+        });
+
+        // Save contact info to separate collection
+        await _firestore
+            .collection('user_contacts')
+            .doc(user.uid)
+            .set({
+          'userId': user.uid,
+          'email': email,
+          'firstName': firstName,
+          'lastName': lastName,
+          'fullName': fullName,
+          'phone': phone,
+          'username': username.toLowerCase(),
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        // Send email verification
+        try {
+          await user.sendEmailVerification();
+          developer.log('Email verification sent successfully');
+        } catch (e) {
+          developer.log('Error sending email verification: $e');
+          // Continue without blocking registration
+        }
+
+        await user.reload();
+        _user = _auth.currentUser;
+        notifyListeners();
+
+        developer.log('User created with complete profile successfully');
+        return user;
+      }
+    } catch (e) {
+      developer.log('Error creating user with complete profile: $e');
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+    return null;
   }
 }

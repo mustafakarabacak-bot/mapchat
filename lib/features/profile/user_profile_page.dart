@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:ui';
+import '../messages/chat_page.dart';
 
 class UserProfilePage extends StatefulWidget {
   final String userId;
@@ -45,6 +47,66 @@ class _UserProfilePageState extends State<UserProfilePage> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _sendMessage() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Oturum açmanız gerekiyor')),
+      );
+      return;
+    }
+
+    // Kendisine mesaj göndermeyi engelle
+    if (currentUser.uid == widget.userId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Kendinize mesaj gönderemezsiniz')),
+      );
+      return;
+    }
+
+    try {
+      // Konuşma ID'sini oluştur (alfabetik sıra)
+      final participants = [currentUser.uid, widget.userId];
+      participants.sort();
+      final conversationId = '${participants[0]}_${participants[1]}';
+
+      // Konuşma var mı kontrol et
+      final conversationDoc = await FirebaseFirestore.instance
+          .collection('conversations')
+          .doc(conversationId)
+          .get();
+
+      if (!conversationDoc.exists) {
+        // Konuşma yoksa oluştur
+        await FirebaseFirestore.instance
+            .collection('conversations')
+            .doc(conversationId)
+            .set({
+          'participants': participants,
+          'lastMessage': '',
+          'lastMessageTime': FieldValue.serverTimestamp(),
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // Chat sayfasına git
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatPage(
+            conversationId: conversationId,
+            otherUserId: widget.userId,
+            otherUserData: _userData!,
+          ),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Hata: $e')),
+      );
     }
   }
 
@@ -223,9 +285,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () {
-                          // Mesaj gönder
-                        },
+                        onPressed: () => _sendMessage(),
                         icon: const Icon(Icons.message),
                         label: const Text('Mesaj Gönder'),
                         style: ElevatedButton.styleFrom(

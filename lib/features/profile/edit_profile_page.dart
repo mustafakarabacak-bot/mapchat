@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
+import 'dart:html' as html;
+import 'dart:typed_data';
 import 'package:intl/intl.dart';
 import '../home/home.dart';
 import '../messages/messages_page.dart';
 import '../notifications/notifications_page.dart';
-import 'profile_page.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({Key? key}) : super(key: key);
@@ -25,15 +25,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _usernameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _bioController = TextEditingController();
-  
+
   DateTime? _birthDate;
   String? _gender;
   String? _profileImageUrl;
   List<String> _galleryImages = [];
   bool _isLoading = false;
   int _currentPageIndex = 3; // Profil sayfası
-  
-  final ImagePicker _picker = ImagePicker();
+
   final List<String> _genderOptions = ['Erkek', 'Kadın', 'Diğer'];
 
   @override
@@ -50,7 +49,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             .collection('users')
             .doc(user.uid)
             .get();
-        
+
         if (doc.exists) {
           final data = doc.data()!;
           setState(() {
@@ -75,43 +74,67 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<void> _pickProfileImage() async {
     try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        setState(() => _isLoading = true);
-        
-        final user = FirebaseAuth.instance.currentUser!;
-        final ref = FirebaseStorage.instance
-            .ref()
-            .child('profile_images')
-            .child('${user.uid}.jpg');
-        
-        // Web için bytes kullanma
-        final bytes = await image.readAsBytes();
-        await ref.putData(bytes);
-        final url = await ref.getDownloadURL();
-        
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .update({'profileImageUrl': url});
-        
-        setState(() {
-          _profileImageUrl = url;
-          _isLoading = false;
-        });
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profil fotoğrafı güncellendi'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      // Web için HTML file input kullanımı
+      final html.FileUploadInputElement uploadInput =
+          html.FileUploadInputElement();
+      uploadInput.accept = 'image/*';
+      uploadInput.click();
+
+      uploadInput.onChange.listen((e) async {
+        final files = uploadInput.files;
+        if (files!.isNotEmpty) {
+          setState(() => _isLoading = true);
+
+          final file = files[0];
+          final reader = html.FileReader();
+          reader.readAsArrayBuffer(file);
+
+          reader.onLoadEnd.listen((e) async {
+            try {
+              final bytes = reader.result as Uint8List;
+
+              final user = FirebaseAuth.instance.currentUser!;
+              final ref = FirebaseStorage.instance
+                  .ref()
+                  .child('profile_images')
+                  .child('${user.uid}.jpg');
+
+              await ref.putData(bytes);
+              final url = await ref.getDownloadURL();
+
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .update({'profileImageUrl': url});
+
+              setState(() {
+                _profileImageUrl = url;
+                _isLoading = false;
+              });
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Profil fotoğrafı güncellendi'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            } catch (e) {
+              setState(() => _isLoading = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Fotoğraf yüklenirken hata: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          });
+        }
+      });
     } catch (e) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Fotoğraf yüklenirken hata: $e'),
+          content: Text('Fotoğraf seçilirken hata: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -130,44 +153,68 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
 
     try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        setState(() => _isLoading = true);
-        
-        final user = FirebaseAuth.instance.currentUser!;
-        final timestamp = DateTime.now().millisecondsSinceEpoch;
-        final ref = FirebaseStorage.instance
-            .ref()
-            .child('gallery_images')
-            .child('${user.uid}_$timestamp.jpg');
-        
-        // Web için bytes kullanma
-        final bytes = await image.readAsBytes();
-        await ref.putData(bytes);
-        final url = await ref.getDownloadURL();
-        
-        setState(() {
-          _galleryImages.add(url);
-          _isLoading = false;
-        });
-        
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .update({'galleryImages': _galleryImages});
-            
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Fotoğraf eklendi'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      // Web için HTML file input kullanımı
+      final html.FileUploadInputElement uploadInput =
+          html.FileUploadInputElement();
+      uploadInput.accept = 'image/*';
+      uploadInput.click();
+
+      uploadInput.onChange.listen((e) async {
+        final files = uploadInput.files;
+        if (files!.isNotEmpty) {
+          setState(() => _isLoading = true);
+
+          final file = files[0];
+          final reader = html.FileReader();
+          reader.readAsArrayBuffer(file);
+
+          reader.onLoadEnd.listen((e) async {
+            try {
+              final bytes = reader.result as Uint8List;
+
+              final user = FirebaseAuth.instance.currentUser!;
+              final timestamp = DateTime.now().millisecondsSinceEpoch;
+              final ref = FirebaseStorage.instance
+                  .ref()
+                  .child('gallery_images')
+                  .child('${user.uid}_$timestamp.jpg');
+
+              await ref.putData(bytes);
+              final url = await ref.getDownloadURL();
+
+              setState(() {
+                _galleryImages.add(url);
+                _isLoading = false;
+              });
+
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .update({'galleryImages': _galleryImages});
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Fotoğraf eklendi'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            } catch (e) {
+              setState(() => _isLoading = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Fotoğraf yüklenirken hata: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          });
+        }
+      });
     } catch (e) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Fotoğraf yüklenirken hata: $e'),
+          content: Text('Fotoğraf seçilirken hata: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -177,17 +224,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Future<void> _removeGalleryImage(int index) async {
     try {
       setState(() => _isLoading = true);
-      
+
       final user = FirebaseAuth.instance.currentUser!;
       _galleryImages.removeAt(index);
-      
+
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .update({'galleryImages': _galleryImages});
-      
+
       setState(() => _isLoading = false);
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Fotoğraf silindi'),
@@ -223,7 +270,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         );
       },
     );
-    
+
     if (picked != null && picked != _birthDate) {
       setState(() => _birthDate = picked);
     }
@@ -231,10 +278,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     try {
       setState(() => _isLoading = true);
-      
+
       final user = FirebaseAuth.instance.currentUser!;
       await FirebaseFirestore.instance
           .collection('users')
@@ -246,19 +293,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
         'phone': _phoneController.text.trim(),
         'bio': _bioController.text.trim(),
         'gender': _gender,
-        'birthDate': _birthDate != null ? Timestamp.fromDate(_birthDate!) : null,
+        'birthDate':
+            _birthDate != null ? Timestamp.fromDate(_birthDate!) : null,
         'galleryImages': _galleryImages,
       });
-      
+
       setState(() => _isLoading = false);
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Profil başarıyla güncellendi!'),
           backgroundColor: Colors.green,
         ),
       );
-      
+
       Navigator.pop(context);
     } catch (e) {
       setState(() => _isLoading = false);
@@ -342,7 +390,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: Colors.white.withOpacity(0.1),
-                              border: Border.all(color: Colors.pinkAccent, width: 3),
+                              border: Border.all(
+                                  color: Colors.pinkAccent, width: 3),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.pinkAccent.withOpacity(0.2),
@@ -394,7 +443,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     // Kişisel Bilgiler
                     _buildSectionTitle('Kişisel Bilgiler'),
                     const SizedBox(height: 15),
-                    
+
                     Row(
                       children: [
                         Expanded(
@@ -402,7 +451,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             controller: _firstNameController,
                             label: 'Ad',
                             icon: Icons.person,
-                            validator: (value) => value?.isEmpty == true ? 'Ad gerekli' : null,
+                            validator: (value) =>
+                                value?.isEmpty == true ? 'Ad gerekli' : null,
                           ),
                         ),
                         const SizedBox(width: 15),
@@ -411,21 +461,24 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             controller: _lastNameController,
                             label: 'Soyad',
                             icon: Icons.person_outline,
-                            validator: (value) => value?.isEmpty == true ? 'Soyad gerekli' : null,
+                            validator: (value) =>
+                                value?.isEmpty == true ? 'Soyad gerekli' : null,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 15),
-                    
+
                     _buildTextField(
                       controller: _usernameController,
                       label: 'Kullanıcı Adı',
                       icon: Icons.alternate_email,
-                      validator: (value) => value?.isEmpty == true ? 'Kullanıcı adı gerekli' : null,
+                      validator: (value) => value?.isEmpty == true
+                          ? 'Kullanıcı adı gerekli'
+                          : null,
                     ),
                     const SizedBox(height: 15),
-                    
+
                     _buildTextField(
                       controller: _phoneController,
                       label: 'Telefon Numarası',
@@ -436,7 +489,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
                     // E-posta (salt okunur)
                     _buildTextField(
-                      initialValue: FirebaseAuth.instance.currentUser?.email ?? '',
+                      initialValue:
+                          FirebaseAuth.instance.currentUser?.email ?? '',
                       label: 'E-posta',
                       icon: Icons.email,
                       enabled: false,
@@ -462,14 +516,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.calendar_today, color: Colors.white70),
+                                const Icon(Icons.calendar_today,
+                                    color: Colors.white70),
                                 const SizedBox(width: 15),
                                 Text(
                                   _birthDate != null
-                                      ? DateFormat('dd/MM/yyyy').format(_birthDate!)
+                                      ? DateFormat('dd/MM/yyyy')
+                                          .format(_birthDate!)
                                       : 'Doğum Tarihi Seç',
                                   style: TextStyle(
-                                    color: _birthDate != null ? Colors.white : Colors.white70,
+                                    color: _birthDate != null
+                                        ? Colors.white
+                                        : Colors.white70,
                                     fontSize: 16,
                                   ),
                                 ),
@@ -502,14 +560,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               border: InputBorder.none,
                               hintText: 'Cinsiyet Seç',
                               hintStyle: TextStyle(color: Colors.white70),
-                              prefixIcon: Icon(Icons.person, color: Colors.white70),
+                              prefixIcon:
+                                  Icon(Icons.person, color: Colors.white70),
                             ),
                             dropdownColor: const Color(0xFF1A1A1A),
                             style: const TextStyle(color: Colors.white),
                             items: _genderOptions.map((String value) {
                               return DropdownMenuItem<String>(
                                 value: value,
-                                child: Text(value, style: const TextStyle(color: Colors.white)),
+                                child: Text(value,
+                                    style:
+                                        const TextStyle(color: Colors.white)),
                               );
                             }).toList(),
                             onChanged: (String? newValue) {
@@ -530,13 +591,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     const SizedBox(height: 30),
 
                     // Galeri Fotoğrafları
-                    _buildSectionTitle('Galeri Fotoğrafları (${_galleryImages.length}/9)'),
+                    _buildSectionTitle(
+                        'Galeri Fotoğrafları (${_galleryImages.length}/9)'),
                     const SizedBox(height: 15),
-                    
+
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 3,
                         crossAxisSpacing: 10,
                         mainAxisSpacing: 10,
@@ -582,7 +645,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(15),
                               child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                                filter:
+                                    ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                                 child: Container(
                                   decoration: BoxDecoration(
                                     color: Colors.white.withOpacity(0.1),
@@ -640,7 +704,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     width: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white),
                                     ),
                                   )
                                 : const Text(
@@ -681,7 +746,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 15, horizontal: 20),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.25),
                       borderRadius: BorderRadius.circular(20),
@@ -786,7 +852,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
           Navigator.pushReplacement(
             context,
             PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => const HomeScreen(),
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const HomeScreen(),
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
             ),
@@ -795,7 +862,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
           Navigator.pushReplacement(
             context,
             PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => const MessagesPage(),
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const MessagesPage(),
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
             ),
@@ -804,7 +872,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
           Navigator.pushReplacement(
             context,
             PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => const NotificationsPage(),
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  const NotificationsPage(),
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
             ),
@@ -815,27 +884,22 @@ class _EditProfilePageState extends State<EditProfilePage> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: isSelected 
-              ? Colors.white.withOpacity(0.3)
-              : Colors.transparent,
+          color:
+              isSelected ? Colors.white.withOpacity(0.3) : Colors.transparent,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              color: isSelected 
-                  ? const Color(0xFFD2042D)
-                  : Colors.black87,
+              color: isSelected ? const Color(0xFFD2042D) : Colors.black87,
               size: 24,
             ),
             const SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(
-                color: isSelected 
-                    ? const Color(0xFFD2042D)
-                    : Colors.black87,
+                color: isSelected ? const Color(0xFFD2042D) : Colors.black87,
                 fontSize: 9,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               ),
@@ -852,9 +916,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: isSelected 
-            ? Colors.white.withOpacity(0.3)
-            : Colors.transparent,
+        color: isSelected ? Colors.white.withOpacity(0.3) : Colors.transparent,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -865,9 +927,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: isSelected 
-                    ? const Color(0xFFD2042D)
-                    : Colors.black87,
+                color: isSelected ? const Color(0xFFD2042D) : Colors.black87,
                 width: 1.5,
               ),
             ),
@@ -879,7 +939,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       errorBuilder: (context, error, stackTrace) {
                         return Icon(
                           Icons.person,
-                          color: isSelected 
+                          color: isSelected
                               ? const Color(0xFFD2042D)
                               : Colors.black87,
                           size: 14,
@@ -888,9 +948,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     )
                   : Icon(
                       Icons.person,
-                      color: isSelected 
-                          ? const Color(0xFFD2042D)
-                          : Colors.black87,
+                      color:
+                          isSelected ? const Color(0xFFD2042D) : Colors.black87,
                       size: 14,
                     ),
             ),
@@ -899,9 +958,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           Text(
             'Profil',
             style: TextStyle(
-              color: isSelected 
-                  ? const Color(0xFFD2042D)
-                  : Colors.black87,
+              color: isSelected ? const Color(0xFFD2042D) : Colors.black87,
               fontSize: 9,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),

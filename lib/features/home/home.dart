@@ -6,8 +6,9 @@ import '../wallet/wallet_page.dart';
 import '../messages/messages_page.dart';
 import '../notifications/notifications_page.dart';
 import '../profile/profile_page.dart';
+import '../profile/user_profile_page.dart';
 import 'widgets/map_widget.dart';
-import 'widgets/map_widget.dart';
+import '../../services/search_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,8 +18,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _currentPageIndex = 0; // Ana sayfa her zaman seçili
+  final int _currentPageIndex = 0; // Ana sayfa her zaman seçili
   Map<String, dynamic>? _userData;
+  
+  // Arama ile ilgili değişkenler
+  final TextEditingController _searchController = TextEditingController();
+  final SearchService _searchService = SearchService();
+  List<Map<String, dynamic>> _searchResults = [];
+  bool _isSearching = false;
+  bool _showSearchResults = false;
 
   @override
   void initState() {
@@ -26,19 +34,76 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadUserData();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadUserData() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        if (mounted && doc.exists) {
+          setState(() {
+            _userData = doc.data();
+          });
+        }
+      }
+    } catch (e) {
+      // Hata durumunda sessizce geç, kullanıcı verileri yüklenemedi
       if (mounted) {
         setState(() {
-          _userData = doc.data();
+          _userData = null;
         });
       }
     }
+  }
+
+  Future<void> _performSearch(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _showSearchResults = false;
+        _isSearching = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+      _showSearchResults = true;
+    });
+
+    try {
+      final results = await _searchService.searchUsers(query.trim());
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _isSearching = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _searchResults = [];
+          _isSearching = false;
+        });
+      }
+    }
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {
+      _searchResults = [];
+      _showSearchResults = false;
+      _isSearching = false;
+    });
   }
 
   @override
@@ -50,10 +115,10 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Stack(
         children: [
           // Harita - Tam ekran
-          Container(
+          const SizedBox(
             width: double.infinity,
             height: double.infinity,
-            child: const MapWidget(),
+            child: MapWidget(),
           ),
           
           // AppBar - En üstte, menüler için Material wrapper
@@ -66,6 +131,18 @@ class _HomeScreenState extends State<HomeScreen> {
               child: _buildGlassmorphismAppBar(),
             ),
           ),
+
+          // Arama Sonuçları Overlay
+          if (_showSearchResults)
+            Positioned(
+              top: 100,
+              left: 16,
+              right: 16,
+              child: Material(
+                color: Colors.transparent,
+                child: _buildSearchResultsOverlay(),
+              ),
+            ),
           
           // Bottom Navigation - En üstte, menüler için Material wrapper
           Positioned(
@@ -124,13 +201,65 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
                   
-                  const Spacer(),
+                  const SizedBox(width: 15),
+                  
+                  // Arama Kutusu
+                  Expanded(
+                    child: Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.4),
+                          width: 1,
+                        ),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: _performSearch,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Kullanıcı ara...',
+                          hintStyle: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 14,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: Colors.white.withOpacity(0.7),
+                            size: 20,
+                          ),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(
+                                    Icons.clear,
+                                    color: Colors.white.withOpacity(0.7),
+                                    size: 18,
+                                  ),
+                                  onPressed: _clearSearch,
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 15,
+                            vertical: 10,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(width: 15),
                   
                   // Wallet Button (sadece icon)
                   IconButton(
                     icon: const Icon(
                       Icons.account_balance_wallet,
-                      color: Color(0xFFD2042D),
+                      color: Colors.white,
                       size: 24,
                     ),
                     onPressed: () {
@@ -288,7 +417,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               child: ClipOval(
-                child: _userData?['profileImageUrl'] != null
+                child: (_userData != null && 
+                       _userData!['profileImageUrl'] != null && 
+                       _userData!['profileImageUrl'].toString().isNotEmpty)
                     ? Image.network(
                         _userData!['profileImageUrl'],
                         fit: BoxFit.cover,
@@ -325,6 +456,135 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSearchResultsOverlay() {
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 300),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 10,
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: _isSearching
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(
+                  color: Color(0xFFD2042D),
+                ),
+              ),
+            )
+          : _searchResults.isEmpty
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text(
+                      'Kullanıcı bulunamadı',
+                      style: TextStyle(
+                        color: Colors.black54,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(8),
+                  shrinkWrap: true,
+                  itemCount: _searchResults.length,
+                  itemBuilder: (context, index) {
+                    final user = _searchResults[index];
+                    return _buildSearchResultItem(user);
+                  },
+                ),
+    );
+  }
+
+  Widget _buildSearchResultItem(Map<String, dynamic> user) {
+    final name = user['name'] ?? user['fullName'] ?? 'İsimsiz';
+    final username = user['username'] ?? '';
+    final email = user['email'] ?? '';
+    final profileImage = user['profileImageUrl'];
+
+    return ListTile(
+      leading: Container(
+        width: 45,
+        height: 45,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: const Color(0xFFD2042D),
+            width: 2,
+          ),
+        ),
+        child: ClipOval(
+          child: profileImage != null && profileImage.isNotEmpty
+              ? Image.network(
+                  profileImage,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Icon(
+                      Icons.person,
+                      color: Color(0xFFD2042D),
+                    );
+                  },
+                )
+              : const Icon(
+                  Icons.person,
+                  color: Color(0xFFD2042D),
+                ),
+        ),
+      ),
+      title: Text(
+        name,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (username.isNotEmpty)
+            Text(
+              '@$username',
+              style: const TextStyle(
+                color: Color(0xFFD2042D),
+                fontSize: 12,
+              ),
+            ),
+          if (email.isNotEmpty)
+            Text(
+              email,
+              style: const TextStyle(
+                color: Colors.black54,
+                fontSize: 11,
+              ),
+            ),
+        ],
+      ),
+      onTap: () {
+        // Arama sonuçlarını temizle
+        _clearSearch();
+        
+        // Kullanıcı profiline git
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => UserProfilePage(
+              userId: user['id'],
+              username: user['username'],
+            ),
+          ),
+        );
+      },
     );
   }
 }

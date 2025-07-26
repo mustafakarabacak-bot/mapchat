@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="MapChat - Firebase tabanlı harita ve mesajlaşma uygulaması">
+
+  <!-- Mobil optimizasyon -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  
+  <!-- PWA meta tags -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MapChat">
+  
+  <!-- Theme color -->
+  <meta name="theme-color" content="#E91E63">
+  <meta name="msapplication-navbutton-color" content="#E91E63">
+
+  <!-- Icons -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="icons/Icon-512.png">
+
+  <!-- Geolocation Permission -->
+  <meta name="permissions" content="geolocation">
+
+  <title>MapChat - Harita ve Mesajlaşma</title>
+  <link rel="manifest" href="manifest.json">
+  
+  <!-- Simple Loading Style -->
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    }
+    
+    .loading-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #0A0A0A 0%, #1A1A1A 50%, #2A1A2A 100%);
+      z-index: 9999;
+      transition: opacity 0.5s ease-out;
+    }
+    
+    .logo-container {
+      margin-bottom: 30px;
+      animation: logoFloat 3s ease-in-out infinite;
+    }
+    
+    .logo {
+      width: 120px;
+      height: 120px;
+      background: linear-gradient(45deg, #E91E63, #9C27B0);
+      border-radius: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 20px 40px rgba(233, 30, 99, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .logo::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+      transform: rotate(45deg);
+      animation: shimmer 2s infinite;
+    }
+    
+    .logo img {
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
+      z-index: 1;
+    }
+    
+    .app-name {
+      color: white;
+      font-size: 32px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    
+    .app-description {
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 16px;
+      margin-bottom: 40px;
+      text-align: center;
+    }
+    
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255, 255, 255, 0.2);
+      border-top: 3px solid #E91E63;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    @keyframes logoFloat {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+    
+    @keyframes shimmer {
+      0% { transform: translateX(-100%) rotate(45deg); }
+      100% { transform: translateX(100%) rotate(45deg); }
+    }
+    
+    .loading-text {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 14px;
+      margin-top: 20px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 0.3; }
+    }
+    
+    /* Hide loading when Flutter is ready */
+    .loading-container.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div class="loading-container" id="loading">
+    <div class="logo-container">
+      <div class="logo">
+        <img src="assets/images/arkaplansızlogo.png" alt="MapChat Logo">
+      </div>
+    </div>
+    <div class="app-name">MapChat</div>
+    <div class="app-description">Harita ve Mesajlaşma Uygulaması</div>
+    <div class="spinner"></div>
+    <div class="loading-text">Yükleniyor...</div>
+  </div>
+
+  <!-- Flutter Bootstrap -->
+  <script src="flutter_bootstrap.js" async></script>
+  
+  <!-- Push Notification Support -->
+  <script>
+    // Push Notification Registration
+    async function registerPushNotifications() {
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        try {
+          const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+          console.log('Service Worker registered successfully:', registration);
+          
+          // Request notification permission
+          const permission = await Notification.requestPermission();
+          console.log('Notification permission:', permission);
+          
+          return permission === 'granted';
+        } catch (error) {
+          console.error('Service Worker registration failed:', error);
+          return false;
+        }
+      } else {
+        console.log('Push notifications are not supported in this browser');
+        return false;
+      }
+    }
+    
+    // Initialize push notifications when DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+      registerPushNotifications();
+    });
+    
+    // Make function available globally for Flutter
+    window.registerPushNotifications = registerPushNotifications;
+  </script>
+  
+  <!-- Loading Controller -->
+  <script>
+    let loadingRemoved = false;
+    
+    function hideLoading() {
+      if (loadingRemoved) return;
+      loadingRemoved = true;
+      
+      const loading = document.getElementById('loading');
+      if (loading) {
+        loading.classList.add('hidden');
+        setTimeout(() => {
+          loading.remove();
+        }, 500);
+      }
+    }
+    
+    // Flutter yüklendiğinde loading'i kaldır
+    window.addEventListener('flutter-first-frame', hideLoading);
+    
+    // DOM yüklendiğinde loading'i kaldır (fallback)
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(hideLoading, 3000);
+    });
+    
+    // Page load fallback
+    window.addEventListener('load', () => {
+      setTimeout(hideLoading, 2000);
+    });
+    
+    // Son çare - 8 saniye sonra loading'i kaldır
+    setTimeout(hideLoading, 8000);
+  </script>
+</body>
+</html>
